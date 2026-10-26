@@ -1,0 +1,30 @@
+name: Update LIVE prices
+on:
+  schedule:
+    - cron: '7 10,14 * * *'   # 10:07 and 14:07 UTC (about 6am and 10am ET)
+  workflow_dispatch: {}
+permissions:
+  contents: write
+concurrency:
+  group: live-prices
+  cancel-in-progress: false
+jobs:
+  live:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Pull NBA stats and build live.json
+        run: |
+          for i in 1 2 3; do node pull_local.mjs && break; echo "try $i failed"; sleep 20; [ $i = 3 ] && exit 1; done
+      - name: Commit if changed
+        run: |
+          git config user.name "dsx-live-bot"
+          git config user.email "dsx-live-bot@users.noreply.github.com"
+          git add live.json
+          git diff --cached --quiet && echo "no change" && exit 0
+          git commit -m "LIVE prices $(date -u +%F\ %H:%M) UTC"
+          git push
